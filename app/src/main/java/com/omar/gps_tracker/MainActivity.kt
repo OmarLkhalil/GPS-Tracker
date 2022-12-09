@@ -1,6 +1,8 @@
 package com.omar.gps_tracker
 
 import android.Manifest
+import android.content.Intent
+import android.content.IntentSender
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -10,7 +12,9 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
+import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.*
+import com.google.android.gms.tasks.Task
 import com.omar.gps_tracker.base.BaseApplication
 
 class MainActivity : BaseApplication() {
@@ -102,12 +106,36 @@ class MainActivity : BaseApplication() {
         fastestInterval = 5000
         priority = LocationRequest.PRIORITY_HIGH_ACCURACY
     }
+    val REQUEST_LOCATION_CODE = 120
     private fun getUserLocation(){
-        fusedLocationClient.requestLocationUpdates(locationRequest,locationCallBack, Looper.getMainLooper())
-        Log.i(  "", "Get user Location started")
-        Toast.makeText(this, "we can access user location", Toast.LENGTH_SHORT).show()
+        val builder = LocationSettingsRequest.Builder().addLocationRequest(locationRequest)
+        val client: SettingsClient = LocationServices.getSettingsClient(this)
+        val task: Task<LocationSettingsResponse> = client.checkLocationSettings(builder.build())
+
+        task.addOnSuccessListener {
+            fusedLocationClient.requestLocationUpdates(locationRequest,locationCallBack, Looper.getMainLooper())
+            Log.i(  "", "Get user Location started") }
+
+        task.addOnFailureListener { exception ->
+            if (exception is ResolvableApiException){
+                try {
+                    exception.startResolutionForResult(this@MainActivity,REQUEST_LOCATION_CODE)
+                }
+                catch (sendEX: IntentSender.SendIntentException){
+                }
+            }
+    }
     }
 
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if(requestCode == REQUEST_LOCATION_CODE){
+            if(resultCode == RESULT_OK)
+            {
+                getUserLocation()
+            }
+        }
+    }
     override fun onDestroy() {
         super.onDestroy()
         // it may crash your application if it still updating in the background
