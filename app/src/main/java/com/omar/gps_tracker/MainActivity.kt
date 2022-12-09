@@ -1,24 +1,27 @@
 package com.omar.gps_tracker
 
 import android.Manifest
-import android.content.DialogInterface
 import android.content.pm.PackageManager
 import android.os.Build
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
+import com.google.android.gms.location.*
 import com.omar.gps_tracker.base.BaseApplication
 
 class MainActivity : BaseApplication() {
+
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
 
     @RequiresApi(Build.VERSION_CODES.M)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         if(isGPSAllowed()){
             getUserLocation()
         }
@@ -46,7 +49,7 @@ class MainActivity : BaseApplication() {
                 // settings in an effort to convince the user to change their
                 // decision.
 
-                showMessage("we can't change get the nearest driver to you," +
+                showMessage("we can't get the nearest driver to you," +
                         "to use this feature allow location permission")
             }
         }
@@ -64,7 +67,7 @@ class MainActivity : BaseApplication() {
             "to get you the nearest drivers"
             , posActionTitle = "yes",
             posAction = {
-                dialogInterface, i ->  dialogInterface.dismiss()
+                dialogInterface, _ ->  dialogInterface.dismiss()
                 requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
             }
                 ,
@@ -73,7 +76,6 @@ class MainActivity : BaseApplication() {
                         dialogInterface, _ -> dialogInterface.dismiss()
                 }
                 )
-
         }
         else {
             requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -81,15 +83,34 @@ class MainActivity : BaseApplication() {
         }
     }
 
-
     private fun isGPSAllowed(): Boolean{
         Log.i("", "isGPSAllowed")
         return ContextCompat.checkSelfPermission(this,
             Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
     }
 
+    private val locationCallBack: LocationCallback = object: LocationCallback() {
+        override fun onLocationResult(result: LocationResult) {
+            for (location in result.locations){
+                // update UI with location data
+                Log.e("Location Updated",""+ location.latitude + location.longitude)
+            }
+        }
+    }
+    val locationRequest = LocationRequest.create().apply {
+        interval = 10000
+        fastestInterval = 5000
+        priority = LocationRequest.PRIORITY_HIGH_ACCURACY
+    }
     private fun getUserLocation(){
-        Log.i("", "Get user Location started")
+        fusedLocationClient.requestLocationUpdates(locationRequest,locationCallBack, Looper.getMainLooper())
+        Log.i(  "", "Get user Location started")
         Toast.makeText(this, "we can access user location", Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // it may crash your application if it still updating in the background
+        fusedLocationClient.removeLocationUpdates(locationCallBack)
     }
 }
