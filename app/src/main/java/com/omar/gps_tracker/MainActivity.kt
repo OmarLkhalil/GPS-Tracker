@@ -4,27 +4,44 @@ import android.Manifest
 import android.content.Intent
 import android.content.IntentSender
 import android.content.pm.PackageManager
+import android.location.Location
 import android.os.Build
 import android.os.Bundle
 import android.os.Looper
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.*
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.GoogleMap
+import com.google.android.gms.maps.OnMapReadyCallback
+import com.google.android.gms.maps.SupportMapFragment
+import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.Marker
+import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.tasks.Task
 import com.omar.gps_tracker.base.BaseApplication
+import com.omar.gps_tracker.databinding.ActivityMainBinding
+import java.util.zip.Inflater
 
-class MainActivity : BaseApplication() {
+class MainActivity : BaseApplication(), OnMapReadyCallback {
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private lateinit var GoogleMap : GoogleMap
+    private lateinit var binding   : ActivityMainBinding
 
     @RequiresApi(Build.VERSION_CODES.M)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+
+        val mapFragment = supportFragmentManager
+            .findFragmentById(R.id.map) as SupportMapFragment
+        mapFragment.getMapAsync(this)
+
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         if(isGPSAllowed()){
             getUserLocation()
@@ -141,4 +158,27 @@ class MainActivity : BaseApplication() {
         // it may crash your application if it still updating in the background
         fusedLocationClient.removeLocationUpdates(locationCallBack)
     }
+
+    override fun onMapReady(googleMap: GoogleMap) {
+
+        this.GoogleMap=googleMap
+        drawUserMarkerOnMap()
+    }
+
+    var userMarker : Marker?=null
+    var userLocation: Location?=null
+    private fun drawUserMarkerOnMap() {
+        if (userLocation==null)return
+        val ltlng=LatLng(userLocation?.latitude?:0.0,userLocation?.longitude?:0.0)
+        val markerOption =MarkerOptions()
+        markerOption.position(ltlng) //get this from user location
+        markerOption.title("current location")
+        if (userMarker==null)
+            userMarker=GoogleMap.addMarker(markerOption)
+        else userMarker?.position=ltlng
+        GoogleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(ltlng,12.0f))
+        GoogleMap.moveCamera(CameraUpdateFactory.newLatLng(ltlng))
+
+    }
+
 }
